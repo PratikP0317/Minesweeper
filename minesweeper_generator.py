@@ -1,6 +1,7 @@
 import numpy as np
 import random
 from typing import Tuple, List, Optional
+from enum import Enum
 
 class MinesweeperGenerator:
     """
@@ -9,6 +10,10 @@ class MinesweeperGenerator:
     - Game board: 0-8 for revealed numbers, -1 for unrevealed
     - Mine board: Binary matrix (1 = mine, 0 = safe)
     """
+    class Encoding(Enum):
+        Flag = -2
+        UNREVEALED = -1
+        REVEALED = 0-8
     
     def __init__(self):
         # Google-like difficulty presets (rows, cols, mines)
@@ -18,7 +23,7 @@ class MinesweeperGenerator:
             'expert': (16, 30, 99)
         }
     
-    def generate_board(self, difficulty: str = 'beginner', first_click: Optional[Tuple[int, int]] = None) -> Tuple[np.ndarray, np.ndarray]:
+    def generate_board(self, difficulty: str = 'beginner', first_click: Optional[Tuple[int, int]] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Generate a Minesweeper board where the first click is guaranteed to be safe.
         
@@ -167,20 +172,3 @@ if __name__ == "__main__":
     # Show what happens after first click
     revealed_board = generator.click_cell(game_board, number_board, 4, 4)
     generator.print_board(revealed_board, "Game Board after first click (4,4)")
-    
-    # Generate training data
-    print("\nGenerating training data...")
-    game_boards, mine_boards = generator.generate_training_data(5, 'beginner')
-    print(f"Generated {len(game_boards)} boards with shape {game_boards[0].shape}")
-    
-    # Create ML dataset
-    print("\nCreating ML dataset...")
-    X, y = generator.create_ml_dataset(10, 'beginner', first_click=(4, 4))
-    print(f"ML dataset shapes: X={X.shape}, y={y.shape}")
-    
-    # Test different difficulties
-    for difficulty in ['beginner', 'intermediate', 'expert']:
-        rows, cols, mines = generator.difficulties[difficulty]
-        print(f"\n{difficulty.capitalize()}: {rows}x{cols} with {mines} mines")
-        game_board, mine_board, number_board = generator.generate_board(difficulty)
-        print(f"Board shape: {game_board.shape}") 

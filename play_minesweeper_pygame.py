@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# Minesweeper game as a gym environment for RL training.
 """
 Minesweeper game as a gym environment for RL training.
 """
@@ -9,12 +9,20 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 from minesweeper_generator import MinesweeperGenerator
+from typing import Optional, Dict, Any, Tuple
+from strategies import *
+import time
 
 class MinesweeperGame(gym.Env):
     def __init__(self, difficulty='beginner', render=True):
+        super().__init__()
         self.generator = MinesweeperGenerator()
         self.difficulty = difficulty
         self.rows, self.cols, self.mines = self.generator.difficulties[difficulty]
+        
+        # Define action and observation spaces
+        self.action_space = spaces.Discrete(self.rows * self.cols)
+        self.observation_space = spaces.Box(low=-3, high=8, shape=(self.rows, self.cols), dtype=np.int32)
         
         # Generate the board
         self.game_board, self.mine_board, self.number_board = self.generator.generate_board(difficulty)
@@ -24,8 +32,8 @@ class MinesweeperGame(gym.Env):
         self.first_click = True
         
         # Rendering setup
-        self.render = render
-        if self.render:
+        self.should_render = render
+        if self.should_render:
             # Pygame setup
             self.cell_size = 30
             self.margin = 50
@@ -63,7 +71,7 @@ class MinesweeperGame(gym.Env):
     
     def draw_board(self):
         """Draw the game board."""
-        if not self.render:
+        if not self.should_render:
             return
             
         self.screen.fill(self.WHITE)
@@ -138,7 +146,7 @@ class MinesweeperGame(gym.Env):
     
     def get_cell_from_pos(self, pos):
         """Convert mouse position to cell coordinates."""
-        if not self.render:
+        if not self.should_render:
             return None
         x, y = pos
         if (self.margin <= x < self.width - self.margin and 
@@ -173,6 +181,7 @@ class MinesweeperGame(gym.Env):
         
         # Reveal the cell
         self.revealed_board = self.generator.click_cell(self.revealed_board, self.number_board, row, col)
+
         
         # Check if won
         if self.check_win():
@@ -211,16 +220,16 @@ class MinesweeperGame(gym.Env):
     def get_state(self):
         return self.revealed_board.copy()
     
-    def reset(self, seed=None):
+    def reset(self, *, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None) -> Tuple[np.ndarray, Dict[str, Any]]:
         """Reset the game to initial state (gym.Env method)."""
-        super().reset(seed=seed)
+        super().reset(seed=seed, options=options)
         self.game_board, self.mine_board, self.number_board = self.generator.generate_board(self.difficulty)
         self.revealed_board = self.game_board.copy()
         self.game_over = False
         self.won = False
         self.first_click = True
-        self.game_over = False
-        return self.get_state()
+        info = {'mines': self.mines, 'difficulty': self.difficulty}
+        return self.get_state(), info
     
     def step(self, action):
         """Take a step in the environment (gym.Env method)."""
@@ -252,15 +261,15 @@ class MinesweeperGame(gym.Env):
             'mines_remaining': self.mines - np.sum(self.revealed_board == -2)
         }
         
-        return reward, done, info
+        return state, reward, done, False, info
     
     def _get_obs(self):
         """Get the current observation (revealed board)."""
         return self.revealed_board.copy()
     
-    def run(self):
+    def run(self, bot=False):
         """Main game loop."""
-        if not self.render:
+        if not self.should_render:
             # Non-rendering mode - just return after initialization
             return
             
@@ -282,14 +291,35 @@ class MinesweeperGame(gym.Env):
                 
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_r:  # Restart
-                        self.__init__(self.difficulty, render=self.render)
+                        self.__init__(self.difficulty, render=self.should_render)
                     elif event.key == pygame.K_q:  # Quit
                         running = False
-            
+
+            if bot and pygame.key.get_pressed()[pygame.K_SPACE] and not self.game_over:
+                time.sleep(0.1)
+                if not simple_flag_strategy(self):
+                    if not simple_click_strategy(self) and pygame.key.get_pressed()[pygame.K_j]:
+                        click_most_likely_cell(self)
             self.draw_board()
         
         pygame.quit()
         sys.exit()
+
+    def get_unsolved_cells(self):
+        """
+        Returns a list of coordinates (row, col) for revealed number cells
+        that do not have enough bombs flagged around them.
+        """
+        unsolved_cells = []
+        for row in range(self.rows):
+            for col in range(self.cols):
+                cell_value = self.revealed_board[row, col]
+                # Only consider revealed number cells (0-8)
+                if cell_value >= 0:
+                    open_cells, flag_cells = get_neighbors(row, col, self)
+                    if len(open_cells) > 0:
+                        unsolved_cells.append((row, col))
+        return unsolved_cells
 
 def main():
     print("=== Minesweeper Game (Pygame) ===")
@@ -321,7 +351,7 @@ def main():
     
     # Create and start the game
     game = MinesweeperGame(difficulty)
-    game.run()
+    game.run(bot=True)
 
 if __name__ == "__main__":
     main() 
