@@ -69,7 +69,7 @@ class MinesweeperGame(gym.Env):
         }
         return colors.get(val, self.BLACK)
     
-    def draw_board(self):
+    def draw_board(self, prob_board=None):
         """Draw the game board."""
         if not self.should_render:
             return
@@ -88,6 +88,16 @@ class MinesweeperGame(gym.Env):
                 if val == -1:  # Unrevealed
                     pygame.draw.rect(self.screen, self.GRAY, (x, y, self.cell_size, self.cell_size))
                     pygame.draw.rect(self.screen, self.DARK_GRAY, (x, y, self.cell_size, self.cell_size), 2)
+                    
+                    # Draw probability value if available and non-zero
+                    if prob_board is not False and prob_board is not None and prob_board[row, col] > 0:
+                        prob_value = prob_board[row, col]
+                        prob_text = f"{prob_value:.2f}"
+                        # Use smaller font for probability
+                        small_font = pygame.font.Font(None, 16)
+                        text = small_font.render(prob_text, True, self.BLACK)
+                        text_rect = text.get_rect(center=(x + self.cell_size // 2, y + self.cell_size // 2))
+                        self.screen.blit(text, text_rect)
                 elif val == -2:  # Flagged
                     pygame.draw.rect(self.screen, self.GRAY, (x, y, self.cell_size, self.cell_size))
                     pygame.draw.rect(self.screen, self.DARK_GRAY, (x, y, self.cell_size, self.cell_size), 2)
@@ -294,13 +304,15 @@ class MinesweeperGame(gym.Env):
                         self.__init__(self.difficulty, render=self.should_render)
                     elif event.key == pygame.K_q:  # Quit
                         running = False
+            
+            # Get probability board for display
+            prob_board = get_probability_board(self)
 
             if bot and pygame.key.get_pressed()[pygame.K_SPACE] and not self.game_over:
-                time.sleep(0.1)
                 if not simple_flag_strategy(self):
                     if not simple_click_strategy(self) and pygame.key.get_pressed()[pygame.K_j]:
                         click_most_likely_cell(self)
-            self.draw_board()
+            self.draw_board(prob_board)
         
         pygame.quit()
         sys.exit()

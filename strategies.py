@@ -79,3 +79,19 @@ def click_most_likely_cell(game):
                     print(f"flagged ({row}, {col}) with probability undefined (total probability is zero)")
                 return True
     return False
+
+def get_probability_board(game):
+    revealed_board = game.get_state()
+    unsolved_cells = game.get_unsolved_cells()
+    if len(unsolved_cells) == 0:
+        return False
+    propability_board = np.zeros((game.rows, game.cols))
+    for cell in unsolved_cells:
+        row, col = cell
+        value = revealed_board[row, col]
+        open_cells, flag_cells = get_neighbors(row, col, game)
+        value = value - len(flag_cells)
+        value = value / len(open_cells)
+        for open_cell in open_cells:
+            propability_board[open_cell[0], open_cell[1]] += value
+    return propability_board
